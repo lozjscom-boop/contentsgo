@@ -1,5 +1,5 @@
 import "server-only";
-import { NextResponse } from "next/server";
+import { connection, NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { AuthError } from "@/lib/auth";
 import { DomainError, fromDbMessage } from "@/lib/errors";
@@ -16,6 +16,7 @@ type Handler = (req: Request, ctx: Ctx, meta: { requestId: string }) => Promise<
  */
 export function route(name: string, handler: Handler): (req: Request, ctx: Ctx) => Promise<Response> {
   return async (req, ctx) => {
+    await connection(); // 항상 요청 시점에 실행 (빌드 때 미리 만들어지지 않게). try 밖에 둬야 빌드의 중단 신호가 삼켜지지 않는다
     const requestId = crypto.randomUUID().slice(0, 12);
     const started = Date.now();
     let status = 200;

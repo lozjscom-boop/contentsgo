@@ -19,7 +19,7 @@ export default async function Products() {
           const key = p.main_image_asset_id ? keyOf.get(p.main_image_asset_id) : undefined;
           const brand = (p.brands as unknown as { name: string } | null)?.name;
           return (
-            <li key={p.id} className="flex gap-3 rounded border border-zinc-800 p-3">
+            <li key={p.id} className="flex gap-3 card p-3">
               <div className="h-20 w-20 shrink-0 overflow-hidden rounded bg-zinc-900">
                 {key && urls[key] ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={urls[key]} alt={p.name} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-[10px] text-zinc-600">사진 없음</div>}
               </div>

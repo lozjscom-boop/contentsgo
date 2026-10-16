@@ -1,14 +1,21 @@
 import { Suspense } from "react";
 import DeliverableList from "@/components/deliverable-list";
 
-export default function Page() {
+async function List({ sp }: { sp: Promise<{ type?: string; cursor?: string }> }) {
+  const { type, cursor } = await sp;
+  return <DeliverableList base="/editor" type={type} cursor={cursor} empty="편집할 제작물이 없어요." />;
+}
+
+export default function Page({ searchParams }: { searchParams: Promise<{ type?: string; cursor?: string }> }) {
   return (
-    <main className="mx-auto max-w-3xl p-6">
-      <h1 className="mb-1 text-2xl font-bold">편집</h1>
-      <p className="mb-6 text-sm text-zinc-400">제작물을 열어 문구 수정, 장면 재생성, 캐러셀 순서 변경, 문구 포함 PNG 저장을 해요.</p>
-      <Suspense fallback={<p className="text-sm text-zinc-500">불러오는 중…</p>}>
-        <DeliverableList empty="편집할 제작물이 없어요." />
-      </Suspense>
-    </main>
+    <div className="page">
+      <h1 className="page-title">편집</h1>
+      <p className="page-sub">제작물을 열어 문구 수정, 장면 다시 만들기, 캐러셀 순서 변경, 문구 포함 PNG 저장을 해요.</p>
+      <div className="mt-6">
+        <Suspense fallback={<div className="grid grid-cols-2 gap-3 md:grid-cols-4">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="skeleton aspect-[4/5]" />)}</div>}>
+          <List sp={searchParams} />
+        </Suspense>
+      </div>
+    </div>
   );
 }

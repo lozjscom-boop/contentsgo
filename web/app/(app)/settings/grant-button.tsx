@@ -16,7 +16,7 @@ export default function GrantButton({ amount }: { amount: number }) {
   }
   return (
     <div className="flex items-center gap-3">
-      <button onClick={go} disabled={busy} className="rounded bg-white px-3 py-1.5 text-sm font-medium text-black disabled:opacity-40">테스트 크레딧 {amount} 받기</button>
+      <button onClick={go} disabled={busy} className="btn btn-primary disabled:opacity-40">테스트 크레딧 {amount} 받기</button>
       {msg && <span className="text-sm text-zinc-300">{msg}</span>}
     </div>
   );

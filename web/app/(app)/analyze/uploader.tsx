@@ -27,12 +27,12 @@ export default function Uploader({ price }: { price: number }) {
   }
 
   return (
-    <div className="mb-8 rounded border border-dashed border-zinc-600 p-5">
+    <div className="mb-8 rounded-lg border border-line border-dashed border-zinc-600 p-5">
       <p className="mb-3 text-sm text-zinc-300">분석할 영상을 올려주세요 (mp4·mov·webm, 45MB 이하). 분석 1회 {price}크레딧, 실패하면 차감되지 않아요.</p>
       <input ref={input} type="file" accept="video/mp4,video/quicktime,video/webm" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onPick(f); e.target.value = ""; }} />
-      <button disabled={!!busy} onClick={() => input.current?.click()} className="rounded bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-40">영상 올리고 분석하기</button>
+      <button disabled={!!busy} onClick={() => input.current?.click()} className="btn btn-primary disabled:opacity-40">영상 올리고 분석하기</button>
       {busy && <p className="mt-3 text-sm text-zinc-400">{busy}</p>}
-      {err && <p className="mt-3 text-sm text-red-400">{err}</p>}
+      {err && <p className="mt-3 text-sm text-danger">{err}</p>}
     </div>
   );
 }

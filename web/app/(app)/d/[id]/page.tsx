@@ -27,7 +27,7 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
   const anyGenerating = ordered.some((s) => s.status === "generating");
 
   return (
-    <main className="mx-auto max-w-4xl p-6">
+    <div className="page max-w-4xl">
       <AutoRefresh active={anyGenerating} />
       <Link href="/create" className="text-sm text-zinc-400 underline">← 새로 만들기</Link>
       <h1 className="mb-1 mt-2 text-2xl font-bold">{d.type === "image" ? "이미지" : d.type === "carousel" ? "캐러셀" : "영상"} 제작물</h1>
@@ -46,7 +46,7 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
           );
         })}
       </div>
-    </main>
+    </div>
   );
 }
 

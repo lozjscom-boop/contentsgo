@@ -16,7 +16,7 @@ async function call<T>(body: unknown): Promise<Stage<T>> {
 
 type Saved = { id: string; brandName: string; name: string; category: string; facts: string; forbidden: string };
 
-export default function Wizard({ questions, saved }: { questions: Q[]; saved: Saved[] }) {
+export default function Wizard({ questions, saved, initial }: { questions: Q[]; saved: Saved[]; initial?: { fmt: "image" | "carousel" | "video"; aspect: "1:1" | "4:5" | "9:16"; title: string } }) {
   const [product, setProduct] = useState({ brandName: "", name: "", category: "", forbidden: "" });
   const [facts, setFacts] = useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -26,8 +26,8 @@ export default function Wizard({ questions, saved }: { questions: Q[]; saved: Sa
   const [parts, setParts] = useState<Stage<PartsOutput> | null>(null);
   const router = useRouter();
   const [pick, setPick] = useState({ hook: 0, body: 0, cta: 0 });
-  const [fmt, setFmt] = useState<"image" | "carousel" | "video">("image");
-  const [aspect, setAspect] = useState<"1:1" | "4:5" | "9:16">("4:5");
+  const [fmt, setFmt] = useState<"image" | "carousel" | "video">(initial?.fmt ?? "image");
+  const [aspect, setAspect] = useState<"1:1" | "4:5" | "9:16">(initial?.aspect ?? "4:5");
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
 
@@ -56,7 +56,7 @@ export default function Wizard({ questions, saved }: { questions: Q[]; saved: Sa
       <section className="flex flex-col gap-3">
         <h2 className="font-semibold">1. 제품</h2>
         {saved.length > 0 && (
-          <select className="rounded border bg-transparent p-2 text-sm" defaultValue="" onChange={(e) => {
+          <select className="rounded-lg border border-line bg-transparent p-2 text-sm" defaultValue="" onChange={(e) => {
             const p = saved.find((x) => x.id === e.target.value);
             if (!p) return;
             setProduct({ brandName: p.brandName, name: p.name, category: p.category, forbidden: p.forbidden });
@@ -66,11 +66,11 @@ export default function Wizard({ questions, saved }: { questions: Q[]; saved: Sa
             {saved.map((p) => <option key={p.id} value={p.id}>{p.brandName} · {p.name}</option>)}
           </select>
         )}
-        <input className="rounded border p-2" placeholder="브랜드명" value={product.brandName} onChange={(e) => setProduct({ ...product, brandName: e.target.value })} />
-        <input className="rounded border p-2" placeholder="제품명" value={product.name} onChange={(e) => setProduct({ ...product, name: e.target.value })} />
-        <input className="rounded border p-2" placeholder="카테고리 (선택)" value={product.category} onChange={(e) => setProduct({ ...product, category: e.target.value })} />
-        <textarea className="rounded border p-2" rows={3} placeholder={"확인된 사실 (한 줄에 하나, '항목: 내용')\n예) 용량: 5g\n성분: 호호바오일"} value={facts} onChange={(e) => setFacts(e.target.value)} />
-        <input className="rounded border p-2" placeholder="쓰면 안 되는 표현 (쉼표 구분, 선택)" value={product.forbidden} onChange={(e) => setProduct({ ...product, forbidden: e.target.value })} />
+        <input className="rounded-lg border border-line p-2" placeholder="브랜드명" value={product.brandName} onChange={(e) => setProduct({ ...product, brandName: e.target.value })} />
+        <input className="rounded-lg border border-line p-2" placeholder="제품명" value={product.name} onChange={(e) => setProduct({ ...product, name: e.target.value })} />
+        <input className="rounded-lg border border-line p-2" placeholder="카테고리 (선택)" value={product.category} onChange={(e) => setProduct({ ...product, category: e.target.value })} />
+        <textarea className="rounded-lg border border-line p-2" rows={3} placeholder={"확인된 사실 (한 줄에 하나, '항목: 내용')\n예) 용량: 5g\n성분: 호호바오일"} value={facts} onChange={(e) => setFacts(e.target.value)} />
+        <input className="rounded-lg border border-line p-2" placeholder="쓰면 안 되는 표현 (쉼표 구분, 선택)" value={product.forbidden} onChange={(e) => setProduct({ ...product, forbidden: e.target.value })} />
       </section>
 
       <section className="flex flex-col gap-4">
@@ -79,16 +79,16 @@ export default function Wizard({ questions, saved }: { questions: Q[]; saved: Sa
           <label key={q.key} className="flex flex-col gap-1">
             <span className="text-sm font-medium">{q.label}{q.required && " *"}</span>
             <span className="text-xs text-zinc-500">{q.help}</span>
-            <textarea className="rounded border p-2" rows={2} value={answers[q.key] ?? ""} onChange={(e) => setAnswers({ ...answers, [q.key]: e.target.value })} />
+            <textarea className="rounded-lg border border-line p-2" rows={2} value={answers[q.key] ?? ""} onChange={(e) => setAnswers({ ...answers, [q.key]: e.target.value })} />
           </label>
         ))}
-        <button disabled={!ready || !!busy} className="self-start rounded bg-black px-4 py-2 text-white disabled:opacity-40"
+        <button disabled={!ready || !!busy} className="btn btn-primary self-start disabled:opacity-40"
           onClick={() => run("core", async () => { setCore(null); setConcepts(null); setConcept(null); setParts(null); setCore(await call({ stage: "core", product: productInput(), answers })); })}>
           {busy === "core" ? "정리 중…" : "핵심 포인트 정리하기"}
         </button>
       </section>
 
-      {err && <p className="rounded bg-red-50 p-3 text-sm text-red-700">{err}</p>}
+      {err && <p className="rounded bg-red-50 p-3 text-sm text-danger">{err}</p>}
 
       {core && (
         <section className="flex flex-col gap-3">
@@ -96,13 +96,13 @@ export default function Wizard({ questions, saved }: { questions: Q[]; saved: Sa
           <IssueList issues={core.issues} ok={core.ok} />
           <ul className="flex flex-col gap-2">
             {core.data.core_points.map((p, i) => (
-              <li key={i} className="rounded border p-3 text-sm"><b>{p.point}</b><br />{p.why_it_matters}{p.visualizable ? " · 화면으로 보여주기 쉬움" : ""}</li>
+              <li key={i} className="rounded-lg border border-line p-3 text-sm"><b>{p.point}</b><br />{p.why_it_matters}{p.visualizable ? " · 화면으로 보여주기 쉬움" : ""}</li>
             ))}
           </ul>
           {core.data.missing_info_questions.length > 0 && (
             <div className="rounded bg-amber-50 p-3 text-sm">추가로 확인하면 좋아요: {core.data.missing_info_questions.join(" / ")}</div>
           )}
-          <button disabled={!!busy} className="self-start rounded bg-black px-4 py-2 text-white disabled:opacity-40"
+          <button disabled={!!busy} className="btn btn-primary self-start disabled:opacity-40"
             onClick={() => run("concepts", async () => { setConcepts(null); setConcept(null); setParts(null); setConcepts(await call({ stage: "concepts", product: productInput(), answers, core: core.data })); })}>
             {busy === "concepts" ? "콘셉트 만드는 중…" : "콘셉트 3안 보기"}
           </button>
@@ -119,7 +119,7 @@ export default function Wizard({ questions, saved }: { questions: Q[]; saved: Sa
               <span className="text-xs text-zinc-500">근거: {c.rationale}{c.claim_status === "needs_confirmation" ? " · 확인 필요한 주장 포함" : ""}</span>
             </button>
           ))}
-          <button disabled={!concept || !!busy} className="self-start rounded bg-black px-4 py-2 text-white disabled:opacity-40"
+          <button disabled={!concept || !!busy} className="btn btn-primary self-start disabled:opacity-40"
             onClick={() => run("parts", async () => setParts(await call({ stage: "parts", product: productInput(), answers, concept })))}>
             {busy === "parts" ? "만드는 중…" : "선택한 콘셉트로 훅/내용/전환 만들기"}
           </button>
@@ -139,11 +139,11 @@ export default function Wizard({ questions, saved }: { questions: Q[]; saved: Sa
               <label key={f} className="flex items-center gap-1"><input type="radio" checked={fmt === f} onChange={() => setFmt(f)} />{f === "image" ? "단일 이미지" : "캐러셀"}</label>
             ))}
             <label className="flex items-center gap-1 text-zinc-500"><input type="radio" disabled />영상 (연결 전)</label>
-            <select className="rounded border bg-transparent p-1" value={aspect} onChange={(e) => setAspect(e.target.value as typeof aspect)}>
+            <select className="rounded-lg border border-line bg-transparent p-1" value={aspect} onChange={(e) => setAspect(e.target.value as typeof aspect)}>
               <option value="4:5">4:5 (피드)</option><option value="1:1">1:1</option><option value="9:16">9:16 (릴스)</option>
             </select>
           </div>
-          <button disabled={!!busy} className="self-start rounded bg-black px-4 py-2 text-white disabled:opacity-40"
+          <button disabled={!!busy} className="btn btn-primary self-start disabled:opacity-40"
             onClick={() => run("deliverable", async () => {
               const r = await fetch("/api/deliverables", {
                 method: "POST", headers: { "content-type": "application/json" },

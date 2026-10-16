@@ -24,11 +24,11 @@ export default function PhotoUpload({ productId }: { productId: string }) {
   }
   return (
     <div>
-      <label className="inline-block cursor-pointer rounded border border-zinc-600 px-2 py-1 text-xs">
+      <label className="inline-block cursor-pointer rounded-lg border border-line border-zinc-600 px-2 py-1 text-xs">
         {busy ? "올리는 중…" : "제품 사진 올리기"}
         <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" disabled={busy} onChange={(e) => onFile(e.target.files?.[0])} />
       </label>
-      {err && <span className="ml-2 text-xs text-red-400">{err}</span>}
+      {err && <span className="ml-2 text-xs text-danger">{err}</span>}
     </div>
   );
 }

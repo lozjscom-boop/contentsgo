@@ -24,7 +24,7 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
   if (!a) notFound();
   const r = a.status === "done" ? VideoAnalysisResult.safeParse(a.result_json) : null;
   return (
-    <main className="mx-auto max-w-3xl p-6">
+    <div className="page max-w-3xl">
       <Link href="/analyze" className="text-sm text-zinc-400 underline">← 영상 분석</Link>
       <AutoRefresh active={a.status === "analyzing"} />
       <h1 className="mb-4 mt-2 text-2xl font-bold">분석 결과</h1>
@@ -33,7 +33,7 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
         <>
           <p className="mb-1 text-lg">{r.data.summary}</p>
           <p className="mb-5 text-xs text-zinc-500">형식: {r.data.format}</p>
-          <section className="mb-5 rounded border border-zinc-700 p-3 text-sm">
+          <section className="mb-5 card p-3 text-sm">
             <h2 className="mb-1 font-semibold">훅 (처음 3초)</h2>
             <p>{r.data.hook.first_3_sec}</p>
             <p className="mt-1 text-zinc-400">기법: {r.data.hook.technique}</p>
@@ -43,7 +43,7 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
             <h2 className="mb-1 font-semibold">구성</h2>
             <ol className="space-y-2 text-sm">
               {r.data.structure.map((s, i) => (
-                <li key={i} className="rounded border border-zinc-800 p-2">
+                <li key={i} className="card p-2">
                   <span className="text-zinc-400">{fmt(s.start_sec)}–{fmt(s.end_sec)} · {s.role}</span>
                   <p>{s.what_happens}</p>
                   {s.on_screen_text && <p className="text-zinc-400">화면 문구: {s.on_screen_text}</p>}
@@ -59,7 +59,7 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
           <List title="주의할 점" items={r.data.risks} />
         </>
       )}
-    </main>
+    </div>
   );
 }
 

@@ -1,7 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC = ["/login", "/auth/callback", "/api/health"];
+// /api/jobs/run 은 로그인 대신 CRON_SECRET(Bearer)으로 보호된다
+const PUBLIC = ["/login", "/auth/callback", "/api/health", "/api/jobs/run"];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -18,8 +19,11 @@ export async function proxy(request: NextRequest) {
   const { data } = await supabase.auth.getUser();
   const isPublic = PUBLIC.some((p) => request.nextUrl.pathname.startsWith(p));
   if (!data.user && !isPublic) {
+    if (request.nextUrl.pathname.startsWith("/api/")) return NextResponse.json({ error: "unauthorized", detail: "로그인이 필요해요." }, { status: 401 });
     const url = request.nextUrl.clone();
+    const back = request.nextUrl.pathname + request.nextUrl.search;
     url.pathname = "/login";
+    url.search = back !== "/" ? `?next=${encodeURIComponent(back)}` : "";
     return NextResponse.redirect(url);
   }
   return response;

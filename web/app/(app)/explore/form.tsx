@@ -23,19 +23,19 @@ export default function Form() {
   }
 
   return (
-    <form onSubmit={submit} className="mb-8 flex flex-col gap-2 rounded border border-zinc-700 p-4">
+    <form onSubmit={submit} className="mb-8 flex flex-col gap-2 card p-4">
       <div className="flex gap-2">
-        <input required placeholder="제목 (예: 경쟁사 A 사용 장면 광고)" className="min-w-0 flex-1 rounded border bg-transparent p-2 text-sm" value={f.title} maxLength={120} onChange={set("title")} />
-        <select className="rounded border bg-zinc-900 p-2 text-sm" value={f.platform} onChange={set("platform")}>
+        <input required placeholder="제목 (예: 경쟁사 A 사용 장면 광고)" className="min-w-0 flex-1 rounded-lg border border-line bg-transparent p-2 text-sm" value={f.title} maxLength={120} onChange={set("title")} />
+        <select className="rounded-lg border border-line bg-zinc-900 p-2 text-sm" value={f.platform} onChange={set("platform")}>
           {PLATFORMS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
       </div>
-      <input placeholder="링크 (광고 라이브러리·게시물 주소)" className="rounded border bg-transparent p-2 text-sm" value={f.url} onChange={set("url")} />
-      <textarea placeholder="메모: 왜 좋은지, 우리가 가져올 점" rows={2} className="rounded border bg-transparent p-2 text-sm" value={f.notes} onChange={set("notes")} />
-      <input placeholder="태그 (쉼표로 구분)" className="rounded border bg-transparent p-2 text-sm" value={f.tags} onChange={set("tags")} />
+      <input placeholder="링크 (광고 라이브러리·게시물 주소)" className="rounded-lg border border-line bg-transparent p-2 text-sm" value={f.url} onChange={set("url")} />
+      <textarea placeholder="메모: 왜 좋은지, 우리가 가져올 점" rows={2} className="rounded-lg border border-line bg-transparent p-2 text-sm" value={f.notes} onChange={set("notes")} />
+      <input placeholder="태그 (쉼표로 구분)" className="rounded-lg border border-line bg-transparent p-2 text-sm" value={f.tags} onChange={set("tags")} />
       <div className="flex items-center gap-3">
-        <button disabled={busy} className="rounded bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-40">{busy ? "저장 중…" : "저장"}</button>
-        {err && <span className="text-sm text-red-400">{err}</span>}
+        <button disabled={busy} className="btn btn-primary disabled:opacity-40">{busy ? "저장 중…" : "저장"}</button>
+        {err && <span className="text-sm text-danger">{err}</span>}
       </div>
     </form>
   );

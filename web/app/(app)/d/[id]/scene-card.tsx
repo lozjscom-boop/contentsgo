@@ -73,12 +73,12 @@ export default function SceneCard(p: Props) {
         <span>{p.index + 1}. {ROLE[p.role] ?? p.role}</span>
         {p.canReorder && (
           <span className="flex gap-1">
-            <button disabled={!!busy || p.index === 0} onClick={() => move("up")} className="rounded border border-zinc-700 px-1.5 disabled:opacity-30">↑</button>
-            <button disabled={!!busy || p.index === p.total - 1} onClick={() => move("down")} className="rounded border border-zinc-700 px-1.5 disabled:opacity-30">↓</button>
+            <button disabled={!!busy || p.index === 0} onClick={() => move("up")} className="card px-1.5 disabled:opacity-30">↑</button>
+            <button disabled={!!busy || p.index === p.total - 1} onClick={() => move("down")} className="card px-1.5 disabled:opacity-30">↓</button>
           </span>
         )}
       </div>
-      <div className="relative w-full max-w-xs overflow-hidden rounded border border-zinc-700 bg-zinc-900" style={{ aspectRatio: ASPECT[p.aspect] ?? "1 / 1" }}>
+      <div className="relative w-full max-w-xs overflow-hidden card bg-zinc-900" style={{ aspectRatio: ASPECT[p.aspect] ?? "1 / 1" }}>
         {p.url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={p.url} alt={p.caption} className="absolute inset-0 h-full w-full object-cover" />
@@ -93,23 +93,23 @@ export default function SceneCard(p: Props) {
 
       {editing ? (
         <div className="flex max-w-xs flex-col gap-2">
-          <input className="rounded border bg-transparent p-2 text-sm" value={caption} maxLength={80} onChange={(e) => setCaption(e.target.value)} />
-          <textarea className="rounded border bg-transparent p-2 text-sm" rows={3} placeholder="추가 문구 (한 줄에 하나)" value={lines} onChange={(e) => setLines(e.target.value)} />
+          <input className="rounded-lg border border-line bg-transparent p-2 text-sm" value={caption} maxLength={80} onChange={(e) => setCaption(e.target.value)} />
+          <textarea className="rounded-lg border border-line bg-transparent p-2 text-sm" rows={3} placeholder="추가 문구 (한 줄에 하나)" value={lines} onChange={(e) => setLines(e.target.value)} />
           <div className="flex gap-2">
-            <button onClick={save} disabled={!!busy} className="rounded bg-white px-3 py-1.5 text-sm font-medium text-black disabled:opacity-40">{busy === "save" ? "저장 중…" : "저장"}</button>
+            <button onClick={save} disabled={!!busy} className="btn btn-primary disabled:opacity-40">{busy === "save" ? "저장 중…" : "저장"}</button>
             <button onClick={() => { setEditing(false); setCaption(p.caption); setLines(p.overlayLines.join("\n")); }} className="text-sm underline">취소</button>
           </div>
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
-          <button onClick={generate} disabled={!!busy || p.status === "generating"} className="rounded bg-white px-3 py-1.5 text-sm font-medium text-black disabled:opacity-40">
+          <button onClick={generate} disabled={!!busy || p.status === "generating"} className="btn btn-primary disabled:opacity-40">
             {busy === "gen" ? "생성 중…" : p.url ? `다시 만들기 (${p.price}크레딧)` : `이미지 만들기 (${p.price}크레딧)`}
           </button>
-          <button onClick={() => setEditing(true)} disabled={!!busy} className="rounded border border-zinc-600 px-3 py-1.5 text-sm">문구 수정</button>
+          <button onClick={() => setEditing(true)} disabled={!!busy} className="rounded-lg border border-line border-zinc-600 px-3 py-1.5 text-sm">문구 수정</button>
           {p.url && <button onClick={download} disabled={!!busy} className="text-sm underline">{busy === "dl" ? "만드는 중…" : "문구 포함 PNG 저장"}</button>}
         </div>
       )}
-      {err && <p className="max-w-xs text-xs text-red-400">{err}</p>}
+      {err && <p className="max-w-xs text-xs text-danger">{err}</p>}
     </div>
   );
 }

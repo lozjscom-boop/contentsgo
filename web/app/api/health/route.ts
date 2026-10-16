@@ -1,6 +1,4 @@
-import { NextResponse } from "next/server";
-
-export const dynamic = "force-dynamic";
+import { connection, NextResponse } from "next/server";
 
 const REQUIRED = [
   "NEXT_PUBLIC_SUPABASE_URL",
@@ -22,6 +20,7 @@ async function status(url: string, init?: RequestInit) {
 
 /** 환경 점검용. 값은 절대 노출하지 않고, 설정 여부와 연결 상태 코드만 반환한다. */
 export async function GET() {
+  await connection(); // 요청 시점에 실행 (빌드 때 미리 만들어지지 않게)
   const set = Object.fromEntries(REQUIRED.map((k) => [k, Boolean(process.env[k]?.trim())]));
   const env = process.env;
   const checks: Record<string, unknown> = {};

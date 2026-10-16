@@ -5,6 +5,7 @@
 export const CREDIT_PRICES = {
   product_analysis: 3,
   planning: 5,
+  video_analysis: 10,
   image_basic: 10,
   image_advanced: 30,
   carousel_5: 40,

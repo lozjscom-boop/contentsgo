@@ -1,11 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
-import { InsufficientCreditsError, priceOf, reserve, settle } from "../lib/credits";
+import { InsufficientCreditsError, priceOf, reserve, sceneImagePrice, settle } from "../lib/credits";
 
 describe("credits helper", () => {
   it("가격표 수량 계산", () => {
     expect(priceOf("image_basic", 3)).toBe(30);
     expect(() => priceOf("image_basic", 0)).toThrow();
     expect(() => priceOf("image_basic", 1.5)).toThrow();
+  });
+  it("장면 가격: 이미지 30, 캐러셀 장당 8, 영상은 이 경로 불가", () => {
+    expect(sceneImagePrice("image")).toBe(30);
+    expect(sceneImagePrice("carousel")).toBe(8);
+    expect(() => sceneImagePrice("video")).toThrow();
   });
   it("잔액 부족 에러를 구분한다", async () => {
     const admin = { rpc: vi.fn().mockResolvedValue({ error: { message: "insufficient_credits" } }) };

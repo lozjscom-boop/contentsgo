@@ -20,7 +20,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen flex-col md:flex-row">
       <aside className="flex shrink-0 flex-col gap-4 border-b border-zinc-800 p-4 md:w-56 md:border-b-0 md:border-r">
         <div className="text-lg font-bold">컨텐츠고</div>
-        <Nav />
+        <Suspense fallback={null}><Nav /></Suspense>
         <Suspense fallback={null}><Account /></Suspense>
       </aside>
       <div className="flex-1">{children}</div>

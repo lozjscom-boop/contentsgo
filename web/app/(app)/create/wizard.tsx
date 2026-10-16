@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import type { Concept, CorePointsOutput, PartsOutput } from "@/lib/planning/schemas";
+import { useRouter } from "next/navigation";
 
 type Q = { key: string; label: string; help: string; required: boolean };
 type Issue = { severity: string; message: string; path?: string };
@@ -21,6 +22,10 @@ export default function Wizard({ questions }: { questions: Q[] }) {
   const [concepts, setConcepts] = useState<Stage<{ concepts: Concept[] }> | null>(null);
   const [concept, setConcept] = useState<Concept | null>(null);
   const [parts, setParts] = useState<Stage<PartsOutput> | null>(null);
+  const router = useRouter();
+  const [pick, setPick] = useState({ hook: 0, body: 0, cta: 0 });
+  const [fmt, setFmt] = useState<"image" | "carousel" | "video">("image");
+  const [aspect, setAspect] = useState<"1:1" | "4:5" | "9:16">("4:5");
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
 
@@ -108,14 +113,50 @@ export default function Wizard({ questions }: { questions: Q[] }) {
         </section>
       )}
 
-      {parts && (
-        <section className="flex flex-col gap-3">
-          <h2 className="font-semibold">훅 → 내용 → 전환</h2>
+      {parts && core && concept && (
+        <section className="flex flex-col gap-4">
+          <h2 className="font-semibold">훅 → 내용 → 전환 고르기</h2>
           <IssueList issues={parts.issues} ok={parts.ok} />
-          <pre className="overflow-auto rounded bg-zinc-100 p-3 text-xs dark:bg-zinc-900">{JSON.stringify(parts.data, null, 2)}</pre>
-          <p className="text-xs text-zinc-500">다음 단계(제작물 만들기: 이미지/캐러셀/영상)는 곧 연결돼요.</p>
+          <Choice title="훅 (첫 3초)" items={parts.data.hooks.map((h) => ({ label: h.label, text: `${h.caption} — ${h.scene}` }))} value={pick.hook} onChange={(v) => setPick({ ...pick, hook: v })} />
+          <Choice title="내용" items={parts.data.bodies.map((b) => ({ label: b.label, text: `${b.brand_line} (${b.beats.length}장면)` }))} value={pick.body} onChange={(v) => setPick({ ...pick, body: v })} />
+          <Choice title="전환" items={parts.data.ctas.map((c) => ({ label: c.label, text: `${c.offer_line} / ${c.closer}` }))} value={pick.cta} onChange={(v) => setPick({ ...pick, cta: v })} />
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <span className="font-medium">만들 형식</span>
+            {(["image", "carousel"] as const).map((f) => (
+              <label key={f} className="flex items-center gap-1"><input type="radio" checked={fmt === f} onChange={() => setFmt(f)} />{f === "image" ? "단일 이미지" : "캐러셀"}</label>
+            ))}
+            <label className="flex items-center gap-1 text-zinc-500"><input type="radio" disabled />영상 (연결 전)</label>
+            <select className="rounded border bg-transparent p-1" value={aspect} onChange={(e) => setAspect(e.target.value as typeof aspect)}>
+              <option value="4:5">4:5 (피드)</option><option value="1:1">1:1</option><option value="9:16">9:16 (릴스)</option>
+            </select>
+          </div>
+          <button disabled={!!busy} className="self-start rounded bg-black px-4 py-2 text-white disabled:opacity-40"
+            onClick={() => run("deliverable", async () => {
+              const r = await fetch("/api/deliverables", {
+                method: "POST", headers: { "content-type": "application/json" },
+                body: JSON.stringify({ product: productInput(), answers, core: core.data, concept, hook: parts.data.hooks[pick.hook], body: parts.data.bodies[pick.body], cta: parts.data.ctas[pick.cta], type: fmt, aspect }),
+              });
+              const j = await r.json();
+              if (!r.ok) throw new Error(j.error ?? "제작물을 만들지 못했어요");
+              router.push(`/d/${j.deliverableId}`);
+            })}>
+            {busy === "deliverable" ? "만드는 중…" : "제작물 만들기"}
+          </button>
         </section>
       )}
+    </div>
+  );
+}
+
+function Choice({ title, items, value, onChange }: { title: string; items: { label: string; text: string }[]; value: number; onChange: (v: number) => void }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="text-sm font-medium">{title}</div>
+      {items.map((it, i) => (
+        <button key={i} type="button" onClick={() => onChange(i)} className={`rounded border p-3 text-left text-sm ${value === i ? "border-black ring-1 ring-black" : ""}`}>
+          <b>{it.label}</b><br />{it.text}
+        </button>
+      ))}
     </div>
   );
 }

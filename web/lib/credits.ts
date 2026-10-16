@@ -41,3 +41,10 @@ export async function settle(admin: Rpc, workspaceId: string, key: string, captu
   const { error } = await admin.rpc("svc_settle_credits", { p_ws: workspaceId, p_ref: key, p_captured: captured });
   if (error) throw new Error(error.message);
 }
+
+/** 장면 1개 생성 가격. 단일 이미지는 고급(나노바나나 프로) 요금, 캐러셀은 5장 세트 가격을 장당으로 나눈다. */
+export function sceneImagePrice(type: "image" | "carousel" | "video"): number {
+  if (type === "image") return CREDIT_PRICES.image_advanced;
+  if (type === "carousel") return Math.ceil(CREDIT_PRICES.carousel_5 / 5);
+  throw new Error("video_scene_not_supported_here");
+}

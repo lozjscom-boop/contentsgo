@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { createServerSupabase } from "@/lib/supabase/server";
 import GrantButton from "./grant-button";
+import Products from "./products";
 
 async function Credits() {
   const sb = await createServerSupabase();
@@ -27,7 +28,7 @@ export default function SettingsPage() {
     <main className="mx-auto max-w-3xl p-6">
       <h1 className="mb-6 text-2xl font-bold">설정</h1>
       <Suspense fallback={<p className="text-sm text-zinc-500">불러오는 중…</p>}><Credits /></Suspense>
-      <p className="text-sm text-zinc-500">브랜드·제품 등록(제품 사진 포함)은 곧 이 탭에 들어와요.</p>
+      <Suspense fallback={<p className="text-sm text-zinc-500">불러오는 중…</p>}><Products /></Suspense>
     </main>
   );
 }

@@ -15,3 +15,9 @@ export async function signedUrls(paths: string[], opts: { download?: boolean } =
   if (error) throw new Error(error.message);
   return Object.fromEntries((data ?? []).filter((d) => d.signedUrl && d.path).map((d) => [d.path as string, d.signedUrl]));
 }
+
+export async function downloadBase64(path: string): Promise<{ dataBase64: string; mimeType: string }> {
+  const { data, error } = await createAdminSupabase().storage.from(BUCKET).download(path);
+  if (error || !data) throw new Error(`저장소 다운로드 실패: ${error?.message ?? "no data"}`);
+  return { dataBase64: Buffer.from(await data.arrayBuffer()).toString("base64"), mimeType: data.type || "image/jpeg" };
+}

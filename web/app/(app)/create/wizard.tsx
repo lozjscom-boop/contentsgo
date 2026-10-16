@@ -14,7 +14,9 @@ async function call<T>(body: unknown): Promise<Stage<T>> {
   return j;
 }
 
-export default function Wizard({ questions }: { questions: Q[] }) {
+type Saved = { id: string; brandName: string; name: string; category: string; facts: string; forbidden: string };
+
+export default function Wizard({ questions, saved }: { questions: Q[]; saved: Saved[] }) {
   const [product, setProduct] = useState({ brandName: "", name: "", category: "", forbidden: "" });
   const [facts, setFacts] = useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -53,6 +55,17 @@ export default function Wizard({ questions }: { questions: Q[] }) {
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-3">
         <h2 className="font-semibold">1. 제품</h2>
+        {saved.length > 0 && (
+          <select className="rounded border bg-transparent p-2 text-sm" defaultValue="" onChange={(e) => {
+            const p = saved.find((x) => x.id === e.target.value);
+            if (!p) return;
+            setProduct({ brandName: p.brandName, name: p.name, category: p.category, forbidden: p.forbidden });
+            setFacts(p.facts);
+          }}>
+            <option value="">등록한 제품 불러오기…</option>
+            {saved.map((p) => <option key={p.id} value={p.id}>{p.brandName} · {p.name}</option>)}
+          </select>
+        )}
         <input className="rounded border p-2" placeholder="브랜드명" value={product.brandName} onChange={(e) => setProduct({ ...product, brandName: e.target.value })} />
         <input className="rounded border p-2" placeholder="제품명" value={product.name} onChange={(e) => setProduct({ ...product, name: e.target.value })} />
         <input className="rounded border p-2" placeholder="카테고리 (선택)" value={product.category} onChange={(e) => setProduct({ ...product, category: e.target.value })} />

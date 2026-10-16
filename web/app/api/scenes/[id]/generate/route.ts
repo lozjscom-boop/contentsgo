@@ -5,7 +5,8 @@ import { InsufficientCreditsError, reservationKey, reserve, sceneImagePrice, set
 import { createGeminiImage } from "@/lib/providers/image";
 import { ProviderNotConfiguredError } from "@/lib/providers/llm";
 import { createAdminSupabase } from "@/lib/supabase/admin";
-import { signedUrls, uploadCreative } from "@/lib/storage";
+import { downloadBase64, signedUrls, uploadCreative } from "@/lib/storage";
+import type { ReferenceImage } from "@/lib/providers/image";
 import { DeliverableDocument } from "@/lib/planning/schemas";
 
 export const maxDuration = 120;
@@ -55,8 +56,18 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       workspace_id: ws, job_id: jobId, scene_id: sceneId, attempt_no: 1, provider: "gemini", model_id: process.env.GEMINI_IMAGE_MODEL ?? "", status: "submitted",
     }).select("id").single();
 
-    const spec = scene.spec_json as { visual_prompt: string };
-    const img = await gen.generate({ prompt: spec.visual_prompt, aspect: doc.aspect });
+    const spec = scene.spec_json as { visual_prompt: string; preserve_product?: boolean };
+    // 제품 모양이 중요한 장면: 등록된 제품 사진이 있으면 원본을 참조로 전달한다
+    const references: ReferenceImage[] = [];
+    if (spec.preserve_product) {
+      const { data: dd } = await auth.supabase.from("deliverables").select("project_id").eq("id", ver.deliverable_id).single();
+      const { data: pr } = dd ? await auth.supabase.from("projects").select("product_id").eq("id", dd.project_id).single() : { data: null };
+      const { data: prod } = pr ? await auth.supabase.from("products").select("main_image_asset_id").eq("id", pr.product_id).single() : { data: null };
+      const { data: photo } = prod?.main_image_asset_id ? await auth.supabase.from("assets").select("object_key").eq("id", prod.main_image_asset_id).single() : { data: null };
+      if (photo && photo.object_key.startsWith(`${ws}/`)) references.push(await downloadBase64(photo.object_key));
+    }
+    const prompt = references.length ? `${spec.visual_prompt} 첨부한 제품 사진의 모양, 색, 라벨 위치를 그대로 유지한다.` : spec.visual_prompt;
+    const img = await gen.generate({ prompt, aspect: doc.aspect, references: references.length ? references : undefined });
     const bytes = Buffer.from(img.dataBase64, "base64");
     const objectKey = `${ws}/${ver.deliverable_id}/${sceneId}-${Date.now()}.${EXT[img.mimeType] ?? "jpg"}`;
     await uploadCreative(objectKey, bytes, img.mimeType);

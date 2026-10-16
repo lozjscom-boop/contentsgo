@@ -150,3 +150,11 @@ export function lintParts(out: PartsOutput, brandName: string, forbiddenClaims: 
 }
 
 export const hasErrors = (issues: LintIssue[]) => issues.some((i) => i.severity === "error");
+
+/** 사용자가 편집한 문구 검수 (금지 표현, 가짜 후기). 편집으로 규칙을 우회하지 못하게 저장 전에 호출한다. */
+export function lintEditedText(texts: string[], forbiddenClaims: string[]): LintIssue[] {
+  const issues: LintIssue[] = [];
+  const re = claimRegexes(forbiddenClaims);
+  texts.forEach((t, i) => checkText(t, `문구 ${i + 1}`, re, issues));
+  return issues;
+}

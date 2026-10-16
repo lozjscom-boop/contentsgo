@@ -10,7 +10,7 @@ import SceneCard from "./scene-card";
 async function Content({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const sb = await createServerSupabase();
-  const { data: d } = await sb.from("deliverables").select("id, type, status, current_version_id, project_id").eq("id", id).maybeSingle();
+  const { data: d } = await sb.from("deliverables").select("id, workspace_id, type, status, current_version_id, project_id").eq("id", id).maybeSingle();
   if (!d || !d.current_version_id) notFound();
   const { data: ver } = await sb.from("creative_versions").select("document_json").eq("id", d.current_version_id).single();
   const doc = DeliverableDocument.parse(ver!.document_json);
@@ -19,7 +19,7 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
   const { data: assets } = assetIds.length ? await sb.from("assets").select("id, object_key").in("id", assetIds) : { data: [] as { id: string; object_key: string }[] };
   const keyOf = new Map((assets ?? []).map((a) => [a.id, a.object_key]));
   const keys = [...keyOf.values()];
-  const [view, dl] = await Promise.all([signedUrls(keys), signedUrls(keys, { download: true })]);
+  const view = await signedUrls(keys.filter((k) => k.startsWith(`${d.workspace_id}/`)));
   const price = d.type === "video" ? 0 : sceneImagePrice(d.type as "image" | "carousel");
   const ordered = [...(scenes ?? [])].sort((a, b) => Number(a.scene_key.replace(/\D/g, "")) - Number(b.scene_key.replace(/\D/g, "")));
 
@@ -32,12 +32,13 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
       {doc.disclosures.length > 0 && <p className="mb-4 rounded bg-amber-500/10 p-2 text-xs text-amber-300">{doc.disclosures.join(" / ")}</p>}
       {d.type === "video" && <p className="mb-4 rounded bg-zinc-800 p-3 text-sm">영상 제작은 아직 연결 전이에요. 장면 구성까지만 확인할 수 있어요.</p>}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-        {ordered.map((s) => {
+        {ordered.map((s, idx) => {
           const spec = s.spec_json as { caption: string; overlay_lines: string[] };
           const key = s.asset_id ? keyOf.get(s.asset_id) : undefined;
           return (
             <SceneCard key={s.id} sceneId={s.id} role={s.role} caption={spec.caption} overlayLines={spec.overlay_lines} aspect={doc.aspect}
-              url={key ? view[key] ?? null : null} downloadUrl={key ? dl[key] ?? null : null} status={s.status} price={price} />
+              url={key ? view[key] ?? null : null} status={s.status} price={price}
+              index={idx} total={ordered.length} canReorder={d.type === "carousel"} deliverableId={d.id} />
           );
         })}
       </div>

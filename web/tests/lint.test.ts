@@ -127,3 +127,13 @@ describe("lintParts", () => {
     expect(hasErrors(lintConcepts({ concepts: [concept(), concept({ pattern: "portability" }), concept({ pattern: "real_benefit" })] }, []))).toBe(false);
   });
 });
+
+import { lintEditedText } from "../lib/planning/lint";
+describe("편집 문구 검수", () => {
+  it("금지 표현과 가짜 후기를 막는다", () => {
+    expect(lintEditedText(["부작용 없는 향"], []).some((i) => i.code === "forbidden_claim")).toBe(true);
+    expect(lintEditedText(["실제 구매자 후기"], []).some((i) => i.code === "fake_testimonial")).toBe(true);
+    expect(lintEditedText(["주간 한정 구성"], ["최저가"])).toEqual([]);
+    expect(lintEditedText(["최저가 보장"], ["최저가"]).length).toBeGreaterThan(0);
+  });
+});

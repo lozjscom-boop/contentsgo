@@ -35,10 +35,10 @@ create trigger plan_versions_immutable before update or delete on public.plan_ve
 for each row execute function private.plan_version_immutable();
 
 insert into public.plan_versions (code, version, name, price_krw, monthly_credits, limits_json, status, published_at) values
- ('trial',   1, '체험',    0,      0,    '{"brands":1,"products":1,"seats":1,"storage_gb":0.5,"concurrent_jobs":1,"pending_jobs":1,"exports_month":3,"proposals_month":1,"trial_credits":30,"trial_days":7}', 'published', now()),
- ('starter', 1, 'Starter', 49000,  500,  '{"brands":1,"products":5,"seats":1,"storage_gb":10,"concurrent_jobs":1,"pending_jobs":5,"exports_month":100,"proposals_month":10}',  'published', now()),
- ('growth',  1, 'Growth',  99000,  1100, '{"brands":5,"products":30,"seats":3,"storage_gb":50,"concurrent_jobs":2,"pending_jobs":15,"exports_month":300,"proposals_month":30}', 'published', now()),
- ('studio',  1, 'Studio',  199000, 2300, '{"brands":20,"products":150,"seats":10,"storage_gb":150,"concurrent_jobs":4,"pending_jobs":30,"exports_month":800,"proposals_month":60}', 'published', now());
+ ('trial',   1, '체험',    0,      0,    '{"brands":1,"products":1,"seats":1,"storage_gb":0.5,"concurrent_jobs":1,"pending_jobs":1,"exports_month":3,"proposals_month":1,"planning_calls_month":10,"trial_credits":30,"trial_days":7}', 'published', now()),
+ ('starter', 1, 'Starter', 49000,  500,  '{"brands":1,"products":5,"seats":1,"storage_gb":10,"concurrent_jobs":1,"pending_jobs":5,"exports_month":100,"proposals_month":10,"planning_calls_month":150}',  'published', now()),
+ ('growth',  1, 'Growth',  99000,  1100, '{"brands":5,"products":30,"seats":3,"storage_gb":50,"concurrent_jobs":2,"pending_jobs":15,"exports_month":300,"proposals_month":30,"planning_calls_month":400}', 'published', now()),
+ ('studio',  1, 'Studio',  199000, 2300, '{"brands":20,"products":150,"seats":10,"storage_gb":150,"concurrent_jobs":4,"pending_jobs":30,"exports_month":800,"proposals_month":60,"planning_calls_month":1000}', 'published', now());
 
 -- ---------------------------------------------------------------- 워크스페이스 권한 (현재 적용 플랜)
 create table public.entitlements (
@@ -378,3 +378,26 @@ revoke all on public.plan_versions, public.entitlements from anon, authenticated
 grant select on public.plan_versions, public.entitlements to authenticated;
 grant select, insert, update on public.plan_versions to service_role;
 grant select on public.entitlements to service_role;
+
+-- 서버가 현재 플랜 한도를 한 번에 읽는 래퍼 (service_role 전용)
+create or replace function public.current_plan_limits(p_ws uuid)
+returns jsonb language sql stable as $$ select limits from private.current_plan(p_ws) $$;
+revoke all on function public.current_plan_limits(uuid) from public, anon, authenticated;
+grant execute on function public.current_plan_limits(uuid) to service_role;
+
+-- 만료된 크레딧을 일괄 정리 (sweeper 가 호출). 워크스페이스별로 처리하고 한 번에 p_limit 곳까지만 한다.
+create or replace function private.expire_all_credits(p_limit int default 200)
+returns int language plpgsql security definer set search_path = '' as $$
+declare r record; n int := 0;
+begin
+  for r in select distinct workspace_id from public.credit_buckets
+           where remaining > 0 and expires_at is not null and expires_at <= now() limit p_limit loop
+    perform private.expire_credits(r.workspace_id);
+    n := n + 1;
+  end loop;
+  return n;
+end $$;
+create or replace function public.svc_expire_all_credits(p_limit int default 200)
+returns int language sql as $$ select private.expire_all_credits(p_limit) $$;
+revoke all on function private.expire_all_credits(int), public.svc_expire_all_credits(int) from public, anon, authenticated;
+grant execute on function private.expire_all_credits(int), public.svc_expire_all_credits(int) to service_role;

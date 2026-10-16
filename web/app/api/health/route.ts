@@ -42,6 +42,12 @@ export async function GET() {
       });
     }
   }
+  // DB 마이그레이션 적용 여부 (UPDATE_04_TO_LATEST.sql 실행 확인)
+  if (set.NEXT_PUBLIC_SUPABASE_URL && set.SUPABASE_SECRET_KEY) {
+    for (const t of ["plan_versions", "credit_buckets", "audit_events"]) {
+      checks[`schema_${t}`] = await status(`${env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/${t}?select=*&limit=0`, { headers: { apikey: env.SUPABASE_SECRET_KEY!, Authorization: `Bearer ${env.SUPABASE_SECRET_KEY!}` } });
+    }
+  }
   const ok = Object.values(set).every(Boolean) && Object.values(checks).every((v) => v === 200);
   return NextResponse.json({ ok, set, checks });
 }

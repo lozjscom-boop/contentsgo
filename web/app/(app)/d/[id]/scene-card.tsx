@@ -28,9 +28,25 @@ export default function SceneCard(p: Props) {
   const generate = () => call("gen", async () => {
     const r = await fetch(`/api/scenes/${p.sceneId}/generate`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ requestKey: crypto.randomUUID() }) });
     const j = await r.json();
-    if (!r.ok) throw new Error(j.error === "insufficient_credits" ? "크레딧이 부족해요." : j.error === "provider_not_configured" ? "AI 키 설정이 필요해요." : `${j.error ?? "실패"}${j.detail ? `: ${j.detail}` : ""}`);
-    router.refresh();
+    if (!r.ok) throw new Error(j.detail ?? j.error ?? "접수 실패");
+    router.refresh();                                  // 장면이 '만드는 중'으로 바뀐다. 이후는 AutoRefresh가 완료를 반영한다.
+    await waitForJob(j.jobId as string);               // 같은 화면에 남아 있으면 더 빨리 반영
   });
+
+  async function waitForJob(jobId: string) {
+    for (let i = 0; i < 120; i++) {
+      await new Promise((r) => setTimeout(r, 3000));
+      const r = await fetch(`/api/jobs/status-batch?ids=${jobId}`);
+      if (!r.ok) continue;
+      const job = (await r.json()).jobs?.[0];
+      if (job && ["ready", "failed", "review", "cancelled"].includes(job.status)) {
+        if (job.status === "failed") setErr(job.error ? `생성 실패: ${job.error}` : "생성에 실패했어요. 크레딧은 복구됐어요.");
+        router.refresh();
+        return;
+      }
+      if (job?.status === "provider_unknown") { setErr("결과 확인 중이에요. 잠시 후 확인해주세요."); router.refresh(); return; }
+    }
+  }
 
   const save = () => call("save", async () => {
     const r = await fetch(`/api/scenes/${p.sceneId}/edit`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ caption, overlay_lines: lines.split("\n").map((l) => l.trim()).filter(Boolean) }) });
@@ -67,7 +83,7 @@ export default function SceneCard(p: Props) {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={p.url} alt={p.caption} className="absolute inset-0 h-full w-full object-cover" />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center p-4 text-center text-xs text-zinc-500">{busy === "gen" || p.status === "generating" ? "만드는 중…" : "아직 만들지 않았어요"}</div>
+          <div className="absolute inset-0 flex items-center justify-center p-4 text-center text-xs text-zinc-500">{busy === "gen" || p.status === "generating" ? "만드는 중… (보통 30초~1분)" : p.status === "failed" ? "생성에 실패했어요. 크레딧은 복구됐어요." : "아직 만들지 않았어요"}</div>
         )}
         <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-gradient-to-t from-black/80 to-transparent p-3 text-white">
           <div className="text-base font-bold leading-tight">{p.caption}</div>
@@ -86,7 +102,7 @@ export default function SceneCard(p: Props) {
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
-          <button onClick={generate} disabled={!!busy} className="rounded bg-white px-3 py-1.5 text-sm font-medium text-black disabled:opacity-40">
+          <button onClick={generate} disabled={!!busy || p.status === "generating"} className="rounded bg-white px-3 py-1.5 text-sm font-medium text-black disabled:opacity-40">
             {busy === "gen" ? "생성 중…" : p.url ? `다시 만들기 (${p.price}크레딧)` : `이미지 만들기 (${p.price}크레딧)`}
           </button>
           <button onClick={() => setEditing(true)} disabled={!!busy} className="rounded border border-zinc-600 px-3 py-1.5 text-sm">문구 수정</button>

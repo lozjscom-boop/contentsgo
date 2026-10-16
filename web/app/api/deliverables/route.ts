@@ -1,7 +1,9 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
-import { AuthError, requireWorkspace } from "@/lib/auth";
+import { route, json, parseBody } from "@/lib/api/route";
+import { requireWorkspace } from "@/lib/auth";
+import { DomainError, raise } from "@/lib/errors";
 import { createDeliverable } from "@/lib/deliverables/create";
+import { featureEnabled } from "@/lib/settings";
 import { BodyPart, BriefAnswers, Concept, CorePointsOutput, CtaPart, HookPart, ProductInput } from "@/lib/planning/schemas";
 
 const Body = z.object({
@@ -11,17 +13,15 @@ const Body = z.object({
   aspect: z.enum(["1:1", "4:5", "9:16"]).optional(),
 });
 
-export async function POST(req: Request) {
+export const POST = route("deliverable.create", async (req) => {
+  const body = await parseBody(req, Body);
+  const { supabase, workspaceId, canEdit } = await requireWorkspace();
+  if (!canEdit) throw new DomainError("forbidden", 403, "편집 권한이 없어요.");
+  if (!(await featureEnabled(body.type))) throw new DomainError("feature_disabled", 503, "지금은 이 형식을 만들 수 없어요.");
   try {
-    const { supabase, workspaceId, canEdit } = await requireWorkspace();
-    if (!canEdit) return NextResponse.json({ error: "편집 권한이 없어요" }, { status: 403 });
-    const parsed = Body.safeParse(await req.json());
-    if (!parsed.success) return NextResponse.json({ error: "invalid_input", detail: parsed.error.issues }, { status: 400 });
-    const out = await createDeliverable(supabase, { workspaceId, ...parsed.data });
-    return NextResponse.json(out);
+    return json(await createDeliverable(supabase, { workspaceId, ...body }));
   } catch (e) {
-    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
-    console.error("create deliverable failed", e);
-    return NextResponse.json({ error: (e as Error).message ?? "create_failed" }, { status: 500 });
+    raise({ message: (e as Error).message }); // 플랜 한도(브랜드·제품 수) 등 DB 규칙 위반은 도메인 오류로 변환
+    throw e;
   }
-}
+});

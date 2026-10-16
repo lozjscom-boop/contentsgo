@@ -6,6 +6,7 @@ import { sceneImagePrice } from "@/lib/credits";
 import { signedUrls } from "@/lib/storage";
 import { DeliverableDocument } from "@/lib/planning/schemas";
 import SceneCard from "./scene-card";
+import AutoRefresh from "@/components/auto-refresh";
 
 async function Content({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -23,8 +24,11 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
   const price = d.type === "video" ? 0 : sceneImagePrice(d.type as "image" | "carousel");
   const ordered = [...(scenes ?? [])].sort((a, b) => Number(a.scene_key.replace(/\D/g, "")) - Number(b.scene_key.replace(/\D/g, "")));
 
+  const anyGenerating = ordered.some((s) => s.status === "generating");
+
   return (
     <main className="mx-auto max-w-4xl p-6">
+      <AutoRefresh active={anyGenerating} />
       <Link href="/create" className="text-sm text-zinc-400 underline">← 새로 만들기</Link>
       <h1 className="mb-1 mt-2 text-2xl font-bold">{d.type === "image" ? "이미지" : d.type === "carousel" ? "캐러셀" : "영상"} 제작물</h1>
       <p className="mb-1 text-sm text-zinc-400">소구: {doc.tags.appeal} · 훅 {doc.tags.hook_label} · 전환 {doc.tags.cta_label}</p>

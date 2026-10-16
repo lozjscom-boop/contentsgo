@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { VideoAnalysisResult } from "@/lib/analysis/schema";
+import AutoRefresh from "@/components/auto-refresh";
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 function List({ title, items }: { title: string; items: string[] }) {
@@ -25,8 +26,9 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
   return (
     <main className="mx-auto max-w-3xl p-6">
       <Link href="/analyze" className="text-sm text-zinc-400 underline">← 영상 분석</Link>
+      <AutoRefresh active={a.status === "analyzing"} />
       <h1 className="mb-4 mt-2 text-2xl font-bold">분석 결과</h1>
-      {a.status !== "done" && <p className="rounded bg-zinc-800 p-3 text-sm">{a.status === "failed" ? `분석에 실패했어요 (크레딧은 차감되지 않아요). ${a.error ?? ""}` : "분석이 끝나지 않았어요. 중단된 경우 크레딧은 복구돼요. 다시 올려주세요."}</p>}
+      {a.status !== "done" && <p className="rounded bg-zinc-800 p-3 text-sm">{a.status === "failed" ? `분석에 실패했어요 (크레딧은 차감되지 않아요). ${a.error ?? ""}` : "AI가 분석하는 중이에요. 보통 1~3분 걸려요. 이 화면을 닫아도 계속 진행돼요."}</p>}
       {r?.success && (
         <>
           <p className="mb-1 text-lg">{r.data.summary}</p>

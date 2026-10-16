@@ -1,10 +1,13 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { as, createDb, rejects, signUp, type Db } from "./db-helper";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Row = any;
 let db: Db;
 let A: { id: string; ws: string };
 let B: { id: string; ws: string };
-const svc = (q: string, p: unknown[] = []) => as(db, "service_role", null, q, p);
+const svc = (q: string, p: unknown[] = []) => as(db, "service_role", null, q, p) as Promise<{ rows: Row[] }>;
+const dq = (q: string, p: unknown[] = []) => db.query<Row>(q, p);
 const wallet = async (ws: string) =>
   (await db.query<{ available: number; reserved: number }>("select available::int available, reserved::int reserved from wallet_accounts where workspace_id=$1", [ws])).rows[0];
 const recon = async (ws: string) => (await svc(`select * from public.svc_wallet_reconcile($1)`, [ws])).rows[0];
@@ -23,12 +26,12 @@ describe("플랜·권한·한도", () => {
   });
 
   it("발행된 플랜 버전은 수정·삭제할 수 없다", async () => {
-    expect(await rejects(() => db.query(`update plan_versions set price_krw = 1 where code='starter'`))).toMatch(/immutable/);
-    expect(await rejects(() => db.query(`delete from plan_versions where code='starter'`))).toMatch(/cannot be deleted/);
+    expect(await rejects(() => dq(`update plan_versions set price_krw = 1 where code='starter'`))).toMatch(/immutable/);
+    expect(await rejects(() => dq(`delete from plan_versions where code='starter'`))).toMatch(/cannot be deleted/);
   });
 
   it("체험 플랜은 브랜드 1개·제품 1개까지, 초과하면 DB가 거부한다", async () => {
-    const q = (s: string, p: unknown[] = []) => as(db, "authenticated", B.id, s, p);
+    const q = (s: string, p: unknown[] = []) => as(db, "authenticated", B.id, s, p) as Promise<{ rows: Row[] }>;
     const brand = (await q(`insert into brands(workspace_id,name) values ($1,'b1') returning id`, [B.ws])).rows[0].id;
     expect(await rejects(() => q(`insert into brands(workspace_id,name) values ($1,'b2')`, [B.ws]))).toMatch(/plan_limit_exceeded:brands/);
     await q(`insert into products(workspace_id,brand_id,name) values ($1,$2,'p1')`, [B.ws, brand]);
@@ -39,7 +42,7 @@ describe("플랜·권한·한도", () => {
     await svc(`select public.svc_set_plan($1,'growth','beta_admin','테스트',null)`, [B.ws]);
     const brand = (await db.query<{ id: string }>(`select id from brands where workspace_id=$1`, [B.ws])).rows[0].id;
     await as(db, "authenticated", B.id, `insert into products(workspace_id,brand_id,name) values ($1,$2,'p2')`, [B.ws, brand]);
-    const active = await db.query(`select 1 from entitlements where workspace_id=$1 and status='active'`, [B.ws]);
+    const active = await dq(`select 1 from entitlements where workspace_id=$1 and status='active'`, [B.ws]);
     expect(active.rows.length).toBe(1);
     expect(await rejects(() => svc(`select public.svc_set_plan($1,'nope','beta_admin','x',null)`, [B.ws]))).toMatch(/plan_not_found/);
   });
@@ -78,7 +81,7 @@ describe("크레딧 버킷 (만료·소모 순서)", () => {
   it("만료된 크레딧은 쓸 수 없고 EXPIRE 원장으로 소멸한다", async () => {
     const D = await signUp(db, "d@x.com");
     await svc(`select public.svc_grant_credits($1,30,'t1','체험','trial', now() + interval '1 day')`, [D.ws]);
-    await db.query(`update credit_buckets set expires_at = now() - interval '1 minute' where workspace_id=$1`, [D.ws]);
+    await dq(`update credit_buckets set expires_at = now() - interval '1 minute' where workspace_id=$1`, [D.ws]);
     await svc(`select public.svc_expire_credits($1)`, [D.ws]);      // 스위퍼/지갑 조회 시 실행되는 정리
     expect(await wallet(D.ws)).toEqual({ available: 0, reserved: 0 });
     expect(await rejects(() => svc(`select public.svc_reserve_credits($1,10,'late')`, [D.ws]))).toMatch(/insufficient_credits/);
@@ -91,7 +94,7 @@ describe("크레딧 버킷 (만료·소모 순서)", () => {
     const E = await signUp(db, "e@x.com");
     await svc(`select public.svc_grant_credits($1,40,'t2','체험','trial', now() + interval '1 day')`, [E.ws]);
     await svc(`select public.svc_reserve_credits($1,30,'inflight')`, [E.ws]);
-    await db.query(`update credit_buckets set expires_at = now() - interval '1 minute' where workspace_id=$1`, [E.ws]);
+    await dq(`update credit_buckets set expires_at = now() - interval '1 minute' where workspace_id=$1`, [E.ws]);
     await svc(`select public.svc_expire_credits($1)`, [E.ws]);           // 예약 안 된 10만 소멸
     expect(await wallet(E.ws)).toEqual({ available: 0, reserved: 30 });
     await svc(`select public.svc_settle_credits($1,'inflight',20)`, [E.ws]); // 20 차감, 10 해제 → 이미 만료라 즉시 소멸
@@ -152,9 +155,9 @@ describe("작업 큐", () => {
   });
 
   it("잔액이 부족하면 작업도 만들어지지 않는다", async () => {
-    const before = (await db.query(`select count(*)::int c from jobs where workspace_id=$1`, [J.ws])).rows[0].c;
+    const before = (await dq(`select count(*)::int c from jobs where workspace_id=$1`, [J.ws])).rows[0].c;
     expect(await rejects(() => enqueue(J.ws, "big", { a: 3 }, 999999))).toMatch(/insufficient_credits/);
-    expect((await db.query(`select count(*)::int c from jobs where workspace_id=$1`, [J.ws])).rows[0].c).toBe(before);
+    expect((await dq(`select count(*)::int c from jobs where workspace_id=$1`, [J.ws])).rows[0].c).toBe(before);
   });
 
   it("claim은 워크스페이스 동시성 상한(플랜)을 지키고, 임대된 작업은 다시 잡히지 않는다", async () => {
@@ -207,8 +210,8 @@ describe("작업 큐", () => {
     const a = (await enqueue(L.ws, "s1", { n: 1 })).rows[0].job_id;
     const b = (await enqueue(L.ws, "s2", { n: 2 })).rows[0].job_id;
     await svc(`select * from public.svc_claim_jobs('w', 10, 300, 2, 10)`);
-    await db.query(`update jobs set lease_until = now() - interval '1 minute' where id in ($1,$2)`, [a, b]);
-    await db.query(`insert into generation_attempts(workspace_id, job_id, attempt_no, provider, model_id) values ($1,$2,1,'gemini','m')`, [L.ws, b]);
+    await dq(`update jobs set lease_until = now() - interval '1 minute' where id in ($1,$2)`, [a, b]);
+    await dq(`insert into generation_attempts(workspace_id, job_id, attempt_no, provider, model_id) values ($1,$2,1,'gemini','m')`, [L.ws, b]);
     const r = (await svc(`select * from public.svc_sweep_jobs()`)).rows[0];
     expect(Number(r.requeued)).toBeGreaterThanOrEqual(1);
     expect(Number(r.unknown)).toBeGreaterThanOrEqual(1);
@@ -234,7 +237,7 @@ describe("작업 큐", () => {
     await svc(`select public.svc_grant_credits($1,500,'n-grant','x')`, [N.ws]);
     await svc(`select public.svc_set_plan($1,'studio','beta_admin','t',null)`, [N.ws]);
     for (let i = 0; i < 4; i++) await enqueue(N.ws, `g${i}`, { i });
-    const running = Number((await db.query(`select count(*)::int c from jobs where status='running' and lease_until > now()`)).rows[0].c);
+    const running = Number((await dq(`select count(*)::int c from jobs where status='running' and lease_until > now()`)).rows[0].c);
     const got = (await svc(`select * from public.svc_claim_jobs('w', 10, 300, 4, $1)`, [running + 1])).rows;
     expect(got.length).toBe(1);
   });
@@ -253,23 +256,23 @@ describe("작업 큐", () => {
 describe("목록 projection", () => {
   it("장면이 완성되면 제작물의 진행 수와 대표 이미지가 갱신된다", async () => {
     const P = await signUp(db, "p@x.com");
-    const q = (s: string, p: unknown[] = []) => as(db, "authenticated", P.id, s, p);
+    const q = (s: string, p: unknown[] = []) => as(db, "authenticated", P.id, s, p) as Promise<{ rows: Row[] }>;
     const brand = (await q(`insert into brands(workspace_id,name) values ($1,'b') returning id`, [P.ws])).rows[0].id;
     const prod = (await q(`insert into products(workspace_id,brand_id,name) values ($1,$2,'p') returning id`, [P.ws, brand])).rows[0].id;
     const proj = (await q(`insert into projects(workspace_id,brand_id,product_id,title) values ($1,$2,$3,'t') returning id`, [P.ws, brand, prod])).rows[0].id;
     const d = (await q(`insert into deliverables(workspace_id,project_id,type) values ($1,$2,'carousel') returning id`, [P.ws, proj])).rows[0].id;
-    expect((await db.query(`select deliverable_count c from projects where id=$1`, [proj])).rows[0].c).toBe(1);
+    expect((await dq(`select deliverable_count c from projects where id=$1`, [proj])).rows[0].c).toBe(1);
     const v = (await q(`insert into creative_versions(workspace_id,deliverable_id,version,document_json) values ($1,$2,1,'{}') returning id`, [P.ws, d])).rows[0].id;
     await q(`update deliverables set current_version_id=$1 where id=$2`, [v, d]);
     const s1 = (await q(`insert into scenes(workspace_id,creative_version_id,scene_key,role) values ($1,$2,'s1','hook') returning id`, [P.ws, v])).rows[0].id;
     await q(`insert into scenes(workspace_id,creative_version_id,scene_key,role) values ($1,$2,'s2','body')`, [P.ws, v]);
-    let row = (await db.query(`select scene_total, scene_ready, cover_asset_id from deliverables where id=$1`, [d])).rows[0];
+    let row = (await dq(`select scene_total, scene_ready, cover_asset_id from deliverables where id=$1`, [d])).rows[0];
     expect([row.scene_total, row.scene_ready, row.cover_asset_id]).toEqual([2, 0, null]);
     const asset = (await svc(`insert into assets(workspace_id,kind,object_key,mime,bytes,status) values ($1,'generated_image',$2,'image/png',1,'ready') returning id`, [P.ws, `${P.ws}/x.png`])).rows[0].id;
     await svc(`update scenes set asset_id=$1, status='ready' where id=$2`, [asset, s1]);
-    row = (await db.query(`select scene_total, scene_ready, cover_asset_id from deliverables where id=$1`, [d])).rows[0];
+    row = (await dq(`select scene_total, scene_ready, cover_asset_id from deliverables where id=$1`, [d])).rows[0];
     expect([row.scene_total, row.scene_ready, row.cover_asset_id]).toEqual([2, 1, asset]);
-    expect((await db.query(`select thumbnail_asset_id t from projects where id=$1`, [proj])).rows[0].t).toBe(asset);
+    expect((await dq(`select thumbnail_asset_id t from projects where id=$1`, [proj])).rows[0].t).toBe(asset);
   });
 });
 
@@ -286,12 +289,12 @@ describe("운영자·감사·문의·알림", () => {
 
   it("감사 로그는 수정·삭제할 수 없다", async () => {
     await svc(`insert into audit_events(workspace_id, actor_kind, action) values ($1,'admin','test')`, [A.ws]);
-    expect(await rejects(() => db.query(`update audit_events set action='x'`))).toMatch(/append-only/);
-    expect(await rejects(() => db.query(`delete from audit_events`))).toMatch(/append-only/);
+    expect(await rejects(() => dq(`update audit_events set action='x'`))).toMatch(/append-only/);
+    expect(await rejects(() => dq(`delete from audit_events`))).toMatch(/append-only/);
   });
 
   it("문의: 작성자만 보고, 내부 메모는 고객에게 보이지 않으며, 고객 답변은 티켓을 다시 연다", async () => {
-    const q = (uid: string, s: string, p: unknown[] = []) => as(db, "authenticated", uid, s, p);
+    const q = (uid: string, s: string, p: unknown[] = []) => as(db, "authenticated", uid, s, p) as Promise<{ rows: Row[] }>;
     const t = (await q(A.id, `insert into support_tickets(workspace_id,category,subject) values ($1,'quality','결과가 이상해요') returning id`, [A.ws])).rows[0].id;
     expect(await rejects(() => q(B.id, `insert into support_tickets(workspace_id,category,subject) values ($1,'quality','침투')`, [A.ws]))).not.toBeNull();
     expect((await q(B.id, `select count(*)::int c from support_tickets`)).rows[0].c).toBe(0);
@@ -300,9 +303,9 @@ describe("운영자·감사·문의·알림", () => {
     await svc(`insert into support_messages(ticket_id,author_kind,visibility,body) values ($1,'staff','customer','답변드립니다')`, [t]);
     const seen = (await q(A.id, `select body from support_messages where ticket_id=$1 order by created_at`, [t])).rows.map((r) => r.body);
     expect(seen).toEqual(["첫 문의", "답변드립니다"]);
-    expect((await db.query(`select status from support_tickets where id=$1`, [t])).rows[0].status).toBe("waiting_customer");
+    expect((await dq(`select status from support_tickets where id=$1`, [t])).rows[0].status).toBe("waiting_customer");
     await q(A.id, `insert into support_messages(ticket_id,author_id,author_kind,body) values ($1,$2,'customer','추가 질문')`, [t, A.id]);
-    expect((await db.query(`select status from support_tickets where id=$1`, [t])).rows[0].status).toBe("open");
+    expect((await dq(`select status from support_tickets where id=$1`, [t])).rows[0].status).toBe("open");
     // 고객이 staff 메시지/내부 메모를 직접 쓸 수 없다
     expect(await rejects(() => q(A.id, `insert into support_messages(ticket_id,author_id,author_kind,body) values ($1,$2,'staff','나는 직원')`, [t, A.id]))).not.toBeNull();
     expect(await rejects(() => q(A.id, `insert into support_messages(ticket_id,author_id,author_kind,visibility,body) values ($1,$2,'customer','internal','숨김')`, [t, A.id]))).not.toBeNull();
@@ -341,7 +344,7 @@ describe("팀 초대·권한", () => {
     const mate = await signUp(db, "mate@x.com");
     expect(await rejects(() => svc(`select public.svc_accept_invitation($1,$2,'other@x.com')`, [hash("m"), mate.id]))).toMatch(/invitation_email_mismatch/);
     await svc(`select public.svc_accept_invitation($1,$2,'mate@x.com')`, [hash("m"), mate.id]);
-    expect((await db.query(`select role from memberships where workspace_id=$1 and user_id=$2`, [T.ws, mate.id])).rows[0].role).toBe("editor");
+    expect((await dq(`select role from memberships where workspace_id=$1 and user_id=$2`, [T.ws, mate.id])).rows[0].role).toBe("editor");
     expect(await rejects(() => svc(`select public.svc_accept_invitation($1,$2,'mate@x.com')`, [hash("m"), mate.id]))).toMatch(/invitation_not_pending/);
     expect(await rejects(() => svc(`select public.svc_accept_invitation('nope',$1,'mate@x.com')`, [mate.id]))).toMatch(/invitation_not_found/);
   });
@@ -350,7 +353,7 @@ describe("팀 초대·권한", () => {
     const T = await signUp(db, "owner3@x.com");
     await svc(`select public.svc_set_plan($1,'growth','beta_admin','t',null)`, [T.ws]);
     await svc(`select public.svc_create_invitation($1,'late@x.com','viewer',$2,$3)`, [T.ws, hash("l"), T.id]);
-    await db.query(`update invitations set expires_at = now() - interval '1 minute' where token_hash=$1`, [hash("l")]);
+    await dq(`update invitations set expires_at = now() - interval '1 minute' where token_hash=$1`, [hash("l")]);
     const late = await signUp(db, "late@x.com");
     expect(await rejects(() => svc(`select public.svc_accept_invitation($1,$2,'late@x.com')`, [hash("l"), late.id]))).toMatch(/invitation_expired/);
   });
@@ -360,11 +363,48 @@ describe("팀 초대·권한", () => {
     await svc(`select public.svc_set_plan($1,'growth','beta_admin','t',null)`, [T.ws]);
     expect(await rejects(() => svc(`select public.svc_change_member($1,$2,$3,null,true)`, [T.ws, T.id, T.id]))).toMatch(/last_owner/);
     const adm = await signUp(db, "adm@x.com");
-    await db.query(`insert into memberships(workspace_id,user_id,role) values ($1,$2,'admin')`, [T.ws, adm.id]);
+    await dq(`insert into memberships(workspace_id,user_id,role) values ($1,$2,'admin')`, [T.ws, adm.id]);
     expect(await rejects(() => svc(`select public.svc_change_member($1,$2,$3,null,true)`, [T.ws, T.id, adm.id]))).toMatch(/forbidden/);
     await svc(`select public.svc_change_member($1,$2,$3,'viewer',false)`, [T.ws, adm.id, T.id]);
-    expect((await db.query(`select role from memberships where workspace_id=$1 and user_id=$2`, [T.ws, adm.id])).rows[0].role).toBe("viewer");
+    expect((await dq(`select role from memberships where workspace_id=$1 and user_id=$2`, [T.ws, adm.id])).rows[0].role).toBe("viewer");
     // 역할을 owner로 올리는 것은 이 경로로 불가
     expect(await rejects(() => svc(`select public.svc_change_member($1,$2,$3,'owner',false)`, [T.ws, adm.id, T.id]))).toMatch(/invalid_role/);
+  });
+});
+
+describe("캐러셀 순서 변경 (원자적)", () => {
+  it("이웃 장면과 순서를 맞바꾸고, 끝에서는 아무 일도 없고, 다른 사람 장면은 못 건드린다", async () => {
+    const Q = await signUp(db, "q@x.com");
+    const q = (uid: string, s: string, p: unknown[] = []) => as(db, "authenticated", uid, s, p) as Promise<{ rows: Row[] }>;
+    const brand = (await q(Q.id, `insert into brands(workspace_id,name) values ($1,'b') returning id`, [Q.ws])).rows[0].id;
+    const prod = (await q(Q.id, `insert into products(workspace_id,brand_id,name) values ($1,$2,'p') returning id`, [Q.ws, brand])).rows[0].id;
+    const proj = (await q(Q.id, `insert into projects(workspace_id,brand_id,product_id,title) values ($1,$2,$3,'t') returning id`, [Q.ws, brand, prod])).rows[0].id;
+    const d = (await q(Q.id, `insert into deliverables(workspace_id,project_id,type) values ($1,$2,'carousel') returning id`, [Q.ws, proj])).rows[0].id;
+    const v = (await q(Q.id, `insert into creative_versions(workspace_id,deliverable_id,version,document_json) values ($1,$2,1,'{"type":"carousel"}') returning id`, [Q.ws, d])).rows[0].id;
+    const ids: string[] = [];
+    for (const [i, role] of ["hook", "body", "cta"].entries()) {
+      ids.push((await q(Q.id, `insert into scenes(workspace_id,creative_version_id,scene_key,role) values ($1,$2,$3,$4) returning id`, [Q.ws, v, `s${i + 1}`, role])).rows[0].id);
+    }
+    const order = async () => (await dq(`select role from scenes where creative_version_id=$1 order by scene_key`, [v])).rows.map((r: Row) => r.role);
+    expect((await q(Q.id, `select public.move_scene($1,'down') ok`, [ids[0]])).rows[0].ok).toBe(true);
+    expect(await order()).toEqual(["body", "hook", "cta"]);
+    expect((await q(Q.id, `select public.move_scene($1,'down') ok`, [ids[2]])).rows[0].ok).toBe(false); // 마지막 장
+    expect(await order()).toEqual(["body", "hook", "cta"]);
+    expect(await rejects(() => q(B.id, `select public.move_scene($1,'up')`, [ids[1]]))).toMatch(/scene_not_found/); // 타 워크스페이스
+    expect(await rejects(() => as(db, "anon", null, `select public.move_scene('${ids[1]}','up')`))).toMatch(/permission denied/i);
+  });
+});
+
+describe("만료 일괄 정리", () => {
+  it("expire_all_credits 는 만료된 버킷이 있는 워크스페이스만 정리한다", async () => {
+    const u = await signUp(db, "expall@x.com");
+    await svc(`select public.svc_grant_credits($1, 50, 'ea1', 'n', 'admin', now() + interval '1 day')`, [u.ws]);
+    await db.query(`update public.credit_buckets set expires_at = now() - interval '1 minute' where workspace_id=$1 and source='admin'`, [u.ws]);
+    const before = await wallet(u.ws);
+    const r = await svc(`select public.svc_expire_all_credits(50) n`);
+    expect(Number((r.rows[0] as Row).n)).toBeGreaterThanOrEqual(1);
+    const after = await wallet(u.ws);
+    expect(Number(after.available)).toBe(Number(before.available) - 50);
+    expect((await recon(u.ws)).ok ?? true).toBeTruthy();
   });
 });

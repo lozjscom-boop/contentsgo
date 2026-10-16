@@ -14,10 +14,10 @@ export default function Uploader({ price }: { price: number }) {
     try {
       setBusy("올리는 중… (파일이 크면 오래 걸려요)");
       const assetId = await uploadAsset(file, "reference");
-      setBusy("AI가 분석하는 중… 1~3분 걸려요. 이 화면을 닫지 마세요.");
+      setBusy("접수하는 중…");
       const r = await fetch("/api/analyses", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ assetId, requestKey: crypto.randomUUID() }) });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error === "insufficient_credits" ? "크레딧이 부족해요." : j.error === "migration_missing" ? j.detail : `${j.error ?? "실패"}${j.detail ? `: ${j.detail}` : ""}`);
+      if (!r.ok) throw new Error(j.detail ?? j.error ?? "접수 실패");
       router.push(`/analyze/${j.id}`);
     } catch (e) {
       setErr((e as Error).message);

@@ -270,3 +270,33 @@ do $$ declare d record; begin
 end $$;
 
 create index deliverables_ws_recent_idx on public.deliverables(workspace_id, updated_at desc, id desc);
+
+-- ---------------------------------------------------------------- 캐러셀 순서 변경 (원자적, RLS 적용)
+-- security invoker: 호출한 사용자의 RLS가 그대로 적용되므로 다른 워크스페이스 장면은 건드릴 수 없다.
+create or replace function public.move_scene(p_scene uuid, p_direction text)
+returns boolean language plpgsql security invoker set search_path = '' as $$
+declare me public.scenes; other public.scenes; tmp text := 'tmp-' || gen_random_uuid(); n int; doc_type text;
+begin
+  if p_direction not in ('up','down') then raise exception 'invalid_direction'; end if;
+  select * into me from public.scenes where id = p_scene for update;
+  if not found then raise exception 'scene_not_found'; end if;
+  select document_json ->> 'type' into doc_type from public.creative_versions where id = me.creative_version_id;
+  if doc_type is distinct from 'carousel' then raise exception 'not_carousel'; end if;
+  n := coalesce(nullif(regexp_replace(me.scene_key, '\D', '', 'g'), '')::int, 0);
+  if p_direction = 'up' then
+    select s.* into other from public.scenes s where s.creative_version_id = me.creative_version_id and s.id <> me.id
+       and coalesce(nullif(regexp_replace(s.scene_key, '\D', '', 'g'), '')::int, 0) < n
+     order by coalesce(nullif(regexp_replace(s.scene_key, '\D', '', 'g'), '')::int, 0) desc limit 1 for update;
+  else
+    select s.* into other from public.scenes s where s.creative_version_id = me.creative_version_id and s.id <> me.id
+       and coalesce(nullif(regexp_replace(s.scene_key, '\D', '', 'g'), '')::int, 0) > n
+     order by coalesce(nullif(regexp_replace(s.scene_key, '\D', '', 'g'), '')::int, 0) asc limit 1 for update;
+  end if;
+  if not found then return false; end if;
+  update public.scenes set scene_key = tmp where id = me.id;
+  update public.scenes set scene_key = me.scene_key where id = other.id;
+  update public.scenes set scene_key = other.scene_key where id = me.id;
+  return true;
+end $$;
+revoke all on function public.move_scene(uuid, text) from public, anon;
+grant execute on function public.move_scene(uuid, text) to authenticated;
